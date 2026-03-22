@@ -40,6 +40,17 @@ Thumbs.db
 data/raw/
 *.csv
 *.xlsx
+*.zip
 
 # Logs
 *.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# MLflow experiment data (local only)
+mlruns/
+
+# DVC cache
+.dvc/cache/
+.dvc/tmp/
