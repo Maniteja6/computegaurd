@@ -1,0 +1,39 @@
+{
+  "timestamp": "2026-03-23T13:52:25.261800",
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5
+  },
+  "checks": {
+    "null_rate": {
+      "value": 0.0,
+      "threshold": 0.05,
+      "passed": true,
+      "message": "Null rate 0.00% < 5% OK"
+    },
+    "row_count": {
+      "value": 24897882,
+      "threshold": 100000,
+      "passed": true,
+      "message": "24,897,882 rows OK"
+    },
+    "value_range": {
+      "value": 0,
+      "threshold": 0,
+      "passed": true,
+      "message": "0 negative drive ages OK"
+    },
+    "label_balance": {
+      "value": 0.000943,
+      "threshold": "0.0001 < x < 0.5",
+      "passed": true,
+      "message": "Failure rate 0.0943% OK"
+    },
+    "schema": {
+      "value": [],
+      "passed": true,
+      "message": "Missing columns: None \u2014 OK"
+    }
+  }
+}
