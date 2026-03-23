@@ -41,6 +41,7 @@ data/raw/
 *.csv
 *.xlsx
 *.zip
+*.duckdb
 
 # Logs
 *.log
