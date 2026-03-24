@@ -6,7 +6,7 @@ from mlflow.tracking import MlflowClient
 
 MLFLOW_TRACKING_URI = "sqlite:///mlruns.db"
 EXPERIMENT_NAME     = "computeguard"
-MODEL_NAME          = "computeguard-failure-predictor"
+MODEL_NAME          = "ComputeGuard_XGB_Failure_Predictor"
 DRIFT_JSON_PATH     = "monitoring/reports/drift_summary.json"
 
 def get_production_metrics(client):
@@ -74,6 +74,9 @@ def promote_if_better(client, new_run_id, prod_metrics):
     if should_promote:
         # Get latest model version
         versions = client.search_model_versions(f"name='{MODEL_NAME}'")
+        if not versions:
+            print("      No model versions found to promote.")
+            return False
         latest   = max(versions, key=lambda v: int(v.version))
 
         client.transition_model_version_stage(

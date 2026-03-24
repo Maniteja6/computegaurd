@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ComputeGuard — GPU Node Health</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg       : #0f1117;
+    --surface  : #1a1d27;
+    --surface2 : #22263a;
+    --border   : #2e3250;
+    --text     : #e2e4f0;
+    --muted    : #7b82a8;
+    --green    : #22c55e;
+    --amber    : #f59e0b;
+    --red      : #ef4444;
+    --blue     : #3b82f6;
+    --purple   : #8b5cf6;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .logo { font-size: 18px; font-weight: 600; color: var(--text); }
+  .logo span { color: var(--blue); }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .pulse {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  /* ── LAYOUT ── */
+  .container { padding: 24px 28px; max-width: 1400px; margin: 0 auto; }
+
+  /* ── STAT CARDS ── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .stat-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .stat-value.green  { color: var(--green);  }
+  .stat-value.amber  { color: var(--amber);  }
+  .stat-value.red    { color: var(--red);    }
+  .stat-value.blue   { color: var(--blue);   }
+  .stat-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  /* ── GRID ── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .side-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* ── PANEL ── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .panel-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .live-badge {
+    font-size: 10px;
+    background: rgba(34,197,94,.15);
+    color: var(--green);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  /* ── NODE GRID ── */
+  #node-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .node-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 11px 13px;
+    transition: border-color .2s;
+    cursor: default;
+  }
+  .node-card:hover { border-color: var(--blue); }
+  .node-card.critical { border-left: 3px solid var(--red);   }
+  .node-card.warning  { border-left: 3px solid var(--amber); }
+  .node-card.healthy  { border-left: 3px solid var(--green); }
+  .node-serial {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .node-model {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .node-score-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 8px;
+  }
+  .risk-bar-bg {
+    flex: 1;
+    height: 5px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .risk-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width .5s ease;
+  }
+  .node-score-val {
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 34px;
+    text-align: right;
+  }
+  .node-days {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  /* ── ALERT FEED ── */
+  #alert-feed {
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .alert-item {
+    padding: 9px 11px;
+    border-radius: 7px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    border-left: 3px solid;
+    animation: fadein .4s ease;
+  }
+  @keyframes fadein { from { opacity:0; transform:translateY(-4px); } to { opacity:1; } }
+  .alert-item.critical {
+    background: rgba(239,68,68,.1);
+    border-color: var(--red);
+    color: #fca5a5;
+  }
+  .alert-item.warning {
+    background: rgba(245,158,11,.1);
+    border-color: var(--amber);
+    color: #fcd34d;
+  }
+  .alert-time {
+    font-size: 10px;
+    opacity: .6;
+    margin-top: 3px;
+  }
+
+  /* ── MODEL METRICS ── */
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-name { font-size: 12px; color: var(--muted); }
+  .metric-val  { font-size: 14px; font-weight: 600; color: var(--text); }
+  .metric-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .badge-prod { background: rgba(34,197,94,.15); color: var(--green); }
+  .badge-reg  { background: rgba(59,130,246,.15); color: var(--blue);  }
+
+  .mlflow-btn {
+    display: block;
+    text-align: center;
+    margin-top: 12px;
+    padding: 8px;
+    background: rgba(139,92,246,.15);
+    border: 1px solid rgba(139,92,246,.4);
+    border-radius: 7px;
+    color: var(--purple);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background .2s;
+  }
+  .mlflow-btn:hover { background: rgba(139,92,246,.25); }
+
+  /* ── DRIFT PANEL ── */
+  .drift-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .drift-row:last-child { border-bottom: none; }
+  .drift-ok      { color: var(--green); font-weight: 600; }
+  .drift-warn    { color: var(--amber); font-weight: 600; }
+  .drift-crit    { color: var(--red);   font-weight: 600; }
+
+  canvas { width: 100% !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Compute<span>Guard</span></div>
+  <div class="status-pill">
+    <div class="pulse"></div>
+    <span id="conn-status">Connecting...</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- stat cards -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-label">Total nodes</div>
+      <div class="stat-value blue" id="s-total">—</div>
+      <div class="stat-sub">monitored drives</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Critical</div>
+      <div class="stat-value red" id="s-critical">—</div>
+      <div class="stat-sub">risk score ≥ 0.85</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Warning</div>
+      <div class="stat-value amber" id="s-warning">—</div>
+      <div class="stat-sub">risk score ≥ 0.60</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Healthy</div>
+      <div class="stat-value green" id="s-healthy">—</div>
+      <div class="stat-sub">risk score &lt; 0.60</div>
+    </div>
+  </div>
+
+  <!-- main grid -->
+  <div class="main-grid">
+
+    <!-- node grid -->
+    <div class="panel">
+      <div class="panel-title">
+        Node health grid
+        <span class="live-badge">LIVE</span>
+      </div>
+      <div id="node-grid"></div>
+    </div>
+
+    <!-- right column -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- alert feed -->
+      <div class="panel">
+        <div class="panel-title">Alert feed</div>
+        <div id="alert-feed">
+          <div style="color:var(--muted);font-size:12px;">
+            Waiting for alerts...
+          </div>
+        </div>
+      </div>
+
+      <!-- model metrics -->
+      <div class="panel" id="metrics-panel">
+        <div class="panel-title">Model metrics</div>
+        <div id="metrics-content">
+          <div style="color:var(--muted);font-size:12px;">Loading...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- bottom row -->
+  <div class="side-grid">
+
+    <!-- risk distribution chart -->
+    <div class="panel">
+      <div class="panel-title">Risk score distribution</div>
+      <canvas id="risk-chart" height="160"></canvas>
+    </div>
+
+    <!-- drift status -->
+    <div class="panel">
+      <div class="panel-title">Drift monitoring</div>
+      <div id="drift-content">
+        <div style="color:var(--muted);font-size:12px;">Loading...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = window.location.origin;
+let riskChart = null;
+
+// ── WEBSOCKET ─────────────────────────────────────────────────────────────────
+function connectWS() {
+  const ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+  ws.onopen = () => {
+    document.getElementById('conn-status').textContent = 'Live — updating every 2s';
+  };
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'telemetry_update') {
+      updateNodeGrid(data.nodes);
+      updateSummaryFromWS(data.summary);
+      checkAlerts(data.nodes);
+    }
+  };
+
+  ws.onclose = () => {
+    document.getElementById('conn-status').textContent = 'Reconnecting...';
+    setTimeout(connectWS, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+// ── NODE GRID ─────────────────────────────────────────────────────────────────
+function updateNodeGrid(nodes) {
+  const grid = document.getElementById('node-grid');
+  grid.innerHTML = '';
+
+  nodes.forEach(node => {
+    const risk   = node.risk_score;
+    const status = node.health_status;
+    const color  = status === 'critical' ? '#ef4444'
+                 : status === 'warning'  ? '#f59e0b'
+                 :                         '#22c55e';
+
+    const card = document.createElement('div');
+    card.className = `node-card ${status}`;
+    card.innerHTML = `
+      <div class="node-serial">${node.serial_number}</div>
+      <div class="node-model">${node.model}</div>
+      <div class="node-score-row">
+        <div class="risk-bar-bg">
+          <div class="risk-bar"
+               style="width:${(risk*100).toFixed(1)}%;background:${color}">
+          </div>
+        </div>
+        <div class="node-score-val" style="color:${color}">
+          ${risk.toFixed(3)}
+        </div>
+      </div>
+      <div class="node-days">
+        ~${node.estimated_days_remaining}d remaining
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ── STAT CARDS ────────────────────────────────────────────────────────────────
+function updateSummaryFromWS(summary) {
+  document.getElementById('s-critical').textContent = summary.critical;
+  document.getElementById('s-warning').textContent  = summary.warning;
+  document.getElementById('s-healthy').textContent  = summary.healthy;
+}
+
+// ── ALERTS ────────────────────────────────────────────────────────────────────
+const alertSet = new Set();
+function checkAlerts(nodes) {
+  const feed = document.getElementById('alert-feed');
+  let added  = false;
+
+  nodes.forEach(node => {
+    if (node.health_status === 'critical' && !alertSet.has(node.serial_number)) {
+      alertSet.add(node.serial_number);
+      const item    = document.createElement('div');
+      item.className = 'alert-item critical';
+      item.innerHTML = `
+        <strong>${node.serial_number}</strong> — risk score ${node.risk_score.toFixed(3)}
+        <div class="alert-time">${new Date().toLocaleTimeString()}</div>
+      `;
+      feed.prepend(item);
+      added = true;
+
+      // Keep feed to last 20 alerts
+      while (feed.children.length > 20) {
+        feed.removeChild(feed.lastChild);
+      }
+    }
+  });
+
+  if (feed.children.length === 0 || !added) {
+    const placeholder = feed.querySelector('.placeholder');
+    if (!placeholder && feed.children.length === 0) {
+      feed.innerHTML = `
+        <div class="placeholder" style="color:var(--muted);font-size:12px;">
+          No critical alerts — all nodes healthy.
+        </div>`;
+    }
+  }
+}
+
+// ── LOAD SUMMARY ──────────────────────────────────────────────────────────────
+async function loadSummary() {
+  try {
+    const res  = await fetch(`${API}/api/summary`);
+    const data = await res.json();
+    document.getElementById('s-total').textContent    = data.total.toLocaleString();
+    document.getElementById('s-critical').textContent = data.critical.toLocaleString();
+    document.getElementById('s-warning').textContent  = data.warning.toLocaleString();
+    document.getElementById('s-healthy').textContent  = data.healthy.toLocaleString();
+  } catch(e) { console.error('summary error', e); }
+}
+
+// ── LOAD METRICS ──────────────────────────────────────────────────────────────
+async function loadMetrics() {
+  try {
+    const res  = await fetch(`${API}/api/metrics`);
+    const data = await res.json();
+    const m    = data.models;
+
+    document.getElementById('metrics-content').innerHTML = `
+      <div class="metric-row">
+        <div>
+          <div class="metric-name">Failure predictor</div>
+          <div style="font-size:10px;color:var(--muted)">XGBoost classifier</div>
+        </div>
+        <span class="metric-badge badge-prod">Production</span>
+      </div>
+      <div class="metric-row">
+        <div class="metric-name">ROC AUC</div>
+        <div class="metric-val">${(m.xgboost.roc_auc||0).toFixed(4)||'—'}</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric-name">F1 score</div>
+        <div class="metric-val">${(m.xgboost.f1_score||0).toFixed(4)||'—'}</div>
+      </div>
+      <div class="metric-row">
+        <div>
+          <div class="metric-name">Survival model</div>
+          <div style="font-size:10px;color:var(--muted)">Cox PH</div>
+        </div>
+        <span class="metric-badge badge-reg">Registered</span>
+      </div>
+      <div class="metric-row">
+        <div class="metric-name">C-index</div>
+        <div class="metric-val">${(m.survival.c_index||0).toFixed(4)||'—'}</div>
+      </div>
+      <a class="mlflow-btn" href="${data.mlflow_url}" target="_blank">
+        Open MLflow UI →
+      </a>
+    `;
+
+    const drift = data.drift;
+    const ds    = (drift.drift_share || 0);
+    const cls   = ds > 0.15 ? 'drift-crit' : ds > 0.08 ? 'drift-warn' : 'drift-ok';
+    const label = ds > 0.15 ? 'HIGH' : ds > 0.08 ? 'MODERATE' : 'LOW';
+
+    document.getElementById('drift-content').innerHTML = `
+      <div class="drift-row">
+        <span>Drift share</span>
+        <span class="${cls}">${(ds*100).toFixed(1)}%</span>
+      </div>
+      <div class="drift-row">
+        <span>Drift level</span>
+        <span class="${cls}">${label}</span>
+      </div>
+      <div class="drift-row">
+        <span>Retrain needed</span>
+        <span class="${drift.retrain_needed ? 'drift-crit' : 'drift-ok'}">
+          ${drift.retrain_needed ? 'YES' : 'NO'}
+        </span>
+      </div>
+      <div class="drift-row">
+        <span>Last checked</span>
+        <span style="color:var(--muted);font-size:11px">
+          ${drift.timestamp
+            ? new Date(drift.timestamp).toLocaleString()
+            : 'Not yet run'}
+        </span>
+      </div>
+    `;
+
+  } catch(e) { console.error('metrics error', e); }
+}
+
+// ── RISK DISTRIBUTION CHART ───────────────────────────────────────────────────
+async function loadRiskChart() {
+  try {
+    const res  = await fetch(`${API}/api/risk-distribution`);
+    const data = await res.json();
+
+    const ctx = document.getElementById('risk-chart').getContext('2d');
+    if (riskChart) riskChart.destroy();
+
+    riskChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels  : data.labels,
+        datasets: [{
+          label          : 'Drives',
+          data           : data.values,
+          backgroundColor: [
+            'rgba(34,197,94,.7)',
+            'rgba(34,197,94,.5)',
+            'rgba(245,158,11,.6)',
+            'rgba(239,68,68,.6)',
+            'rgba(239,68,68,.9)',
+          ],
+          borderRadius: 5,
+          borderWidth : 0,
+        }]
+      },
+      options: {
+        responsive : true,
+        plugins    : { legend: { display: false } },
+        scales: {
+          x: {
+            ticks : { color: '#7b82a8', font: { size: 11 } },
+            grid  : { color: '#2e3250' },
+          },
+          y: {
+            ticks : { color: '#7b82a8', font: { size: 11 } },
+            grid  : { color: '#2e3250' },
+          },
+        },
+      },
+    });
+  } catch(e) { console.error('chart error', e); }
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  loadSummary();
+  loadMetrics();
+  loadRiskChart();
+  connectWS();
+
+  // Refresh static panels every 30s
+  setInterval(() => {
+    loadSummary();
+    loadMetrics();
+    loadRiskChart();
+  }, 30000);
+});
+</script>
+</body>
+</html>
