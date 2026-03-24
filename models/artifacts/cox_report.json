@@ -1,0 +1,16 @@
+{
+  "c_index": 0.8393,
+  "n_subjects": 291305,
+  "n_events": 23,
+  "feature_coefs": {
+    "smart_5_raw": 0.023,
+    "smart_187_raw": 0.0193,
+    "smart_197_raw": 0.0185,
+    "smart_198_raw": 0.0997,
+    "smart_5_7d_avg": 0.0231,
+    "smart_187_7d_avg": 0.0188,
+    "smart_5_delta": 0.1254,
+    "smart_197_delta": 0.1704,
+    "drive_age_days": 0.0015
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "TOSHIBA MG08ACA16TA": {
+    "count": 38773,
+    "failures": 0,
+    "median_days": 9999,
+    "survival_30d": 1.0,
+    "survival_60d": 1.0,
+    "survival_90d": 1.0
+  },
+  "TOSHIBA MG07ACA14TA": {
+    "count": 38065,
+    "failures": 5,
+    "median_days": 9999,
+    "survival_30d": 0.9999,
+    "survival_60d": 0.9999,
+    "survival_90d": 0.9999
+  },
+  "ST16000NM001G": {
+    "count": 29980,
+    "failures": 0,
+    "median_days": 9999,
+    "survival_30d": 1.0,
+    "survival_60d": 1.0,
+    "survival_90d": 1.0
+  },
+  "WDC WUH721816ALE6L4": {
+    "count": 26410,
+    "failures": 0,
+    "median_days": 9999,
+    "survival_30d": 1.0,
+    "survival_60d": 1.0,
+    "survival_90d": 1.0
+  },
+  "ST12000NM0008": {
+    "count": 19503,
+    "failures": 3,
+    "median_days": 9999,
+    "survival_30d": 0.9999,
+    "survival_60d": 0.9999,
+    "survival_90d": 0.9998
+  }
+}
